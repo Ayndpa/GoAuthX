@@ -2,23 +2,33 @@ package web
 
 import (
 	"fmt"
+	"goauthx/internal/config"
 	"log"
 	"net/http"
-	"goauthx/pkg/config"
 )
 
-func StartServer(handler http.Handler) error {
+import (
+	"goauthx/internal/web/account/captcha"
+	"goauthx/internal/web/account/users"
+)
+
+func StartServer() error {
 	cfg := config.GetConfig()
 	addr := fmt.Sprintf(":%d", cfg.HTTPServer.Port)
+
+	http.HandleFunc("/captcha", captcha.HandleCaptcha)
+	http.HandleFunc("/login", users.HandleLogin)
+	http.HandleFunc("/register", users.HandleRegister)
+
 	if cfg.HTTPServer.EnableSSL {
 		log.Printf("Starting HTTPS server on %s\n", addr)
 		return http.ListenAndServeTLS(
 			addr,
 			cfg.HTTPServer.SSLCertFile,
 			cfg.HTTPServer.SSLKeyFile,
-			handler,
+			nil,
 		)
 	}
 	log.Printf("Starting HTTP server on %s\n", addr)
-	return http.ListenAndServe(addr, handler)
+	return http.ListenAndServe(addr, nil)
 }

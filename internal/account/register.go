@@ -1,13 +1,12 @@
-package users
+package account
 
 import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
+	"goauthx/internal/db"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"regexp"
-	"server/internal/account"
-	"server/pkg/database"
 	"strings"
 	"time"
 )
@@ -36,8 +35,8 @@ type RegisterResponse struct {
 }
 
 // 注册核心逻辑，供 HTTP handler 和命令复用
-// requireCaptcha: true 表示必须校验验证码，false 表示可跳过（命令调用）
-func RegisterUser(req *RegisterRequest, requireCaptcha bool) (RegisterResponse, int) {
+// 不再处理验证码校验
+func RegisterUser(req *RegisterRequest) (RegisterResponse, int) {
 	trimRegisterRequest(req)
 	req.Username = strings.ToLower(req.Username)
 
@@ -47,21 +46,8 @@ func RegisterUser(req *RegisterRequest, requireCaptcha bool) (RegisterResponse, 
 	if !usernamePattern.MatchString(req.Username) {
 		return RegisterResponse{Code: 1, Message: "Username must be lowercase letters, numbers, or underscores"}, http.StatusBadRequest
 	}
-	if requireCaptcha {
-		if req.Captcha == "" {
-			return RegisterResponse{Code: 1, Message: "Captcha required"}, http.StatusBadRequest
-		}
-		if !account.VerifyCaptcha(req.Email, req.Captcha) {
-			return RegisterResponse{Code: 4, Message: "Invalid or expired captcha"}, http.StatusUnauthorized
-		}
-	} else {
-		// 命令行注册可跳过验证码
-		if req.Captcha != "" && !account.VerifyCaptcha(req.Email, req.Captcha) {
-			return RegisterResponse{Code: 4, Message: "Invalid or expired captcha"}, http.StatusUnauthorized
-		}
-	}
 
-	conn, err := database.GetMongoConnector()
+	conn, err := db.GetMongoConnector()
 	if err != nil {
 		return RegisterResponse{Code: 2, Message: "Database connection error"}, http.StatusInternalServerError
 	}
@@ -88,7 +74,7 @@ func RegisterUser(req *RegisterRequest, requireCaptcha bool) (RegisterResponse, 
 		return RegisterResponse{Code: 2, Message: "Password encryption failed"}, http.StatusInternalServerError
 	}
 
-	userId, err := database.GetNextSequenceValue("user_id")
+	userId, err := db.GetNextSequenceValue("user_id")
 	if err != nil {
 		return RegisterResponse{Code: 2, Message: "Failed to generate userId"}, http.StatusInternalServerError
 	}

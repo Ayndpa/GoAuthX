@@ -7,8 +7,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"server/pkg/config"
-	"server/pkg/database"
+	"goauthx/internal/config"
+	"goauthx/internal/db"
 	"time"
 )
 
@@ -29,7 +29,7 @@ type JWTRecord struct {
 
 // getJWTCollection 获取 users_jwts 集合
 func getJWTCollection() (*mongo.Collection, error) {
-	conn, err := database.GetMongoConnector()
+	conn, err := db.GetMongoConnector()
 	if err != nil {
 		return nil, err
 	}

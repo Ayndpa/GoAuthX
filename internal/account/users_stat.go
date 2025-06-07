@@ -5,8 +5,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"server/internal/account/users/jwts"
-	"server/pkg/database"
+	"goauthx/internal/db"
+	"goauthx/internal/web/account/jwts"
 	"time"
 )
 
@@ -24,7 +24,7 @@ type UserBan struct {
 
 // IsUserBanned checks if the user is currently banned (is_active=1 and ban_end_time is null or in the future)
 func IsUserBanned(userID int) (bool, *UserBan, error) {
-	conn, err := database.GetMongoConnector()
+	conn, err := db.GetMongoConnector()
 	if err != nil {
 		return false, nil, err
 	}
@@ -52,7 +52,7 @@ func IsUserBanned(userID int) (bool, *UserBan, error) {
 
 // BanUser inserts a new ban record for the user
 func BanUser(userID int, bannedBy *int, reason string, banEnd time.Time) error {
-	conn, err := database.GetMongoConnector()
+	conn, err := db.GetMongoConnector()
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func BanUser(userID int, bannedBy *int, reason string, banEnd time.Time) error {
 
 // UnbanUser sets is_active=false for all active bans of the user
 func UnbanUser(userID int) error {
-	conn, err := database.GetMongoConnector()
+	conn, err := db.GetMongoConnector()
 	if err != nil {
 		return err
 	}

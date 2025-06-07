@@ -3,12 +3,12 @@ package captcha
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/patrickmn/go-cache"
+	"goauthx/internal/config"
+	"goauthx/internal/smtp"
 	"math/rand"
 	"net/http"
 	"os"
-	"server/pkg/config"
-	"server/pkg/email"
-	httpServer "server/pkg/web/http"
 	"strings"
 	"time"
 )
@@ -36,17 +36,7 @@ func generateCaptchaCode() string {
 	return fmt.Sprintf("%06d", rnd.Intn(1000000))
 }
 
-type CaptchaHandler struct{}
-
-func (h *CaptchaHandler) Path() string {
-	return "/user/captcha"
-}
-
-func (h *CaptchaHandler) Method() string {
-	return "POST"
-}
-
-func (h *CaptchaHandler) Handle(w http.ResponseWriter, r *http.Request) {
+func HandleCaptcha(w http.ResponseWriter, r *http.Request) {
 	var req CaptchaRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -98,8 +88,8 @@ func (h *CaptchaHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	cfg := config.GetConfig()
 	htmlBody := strings.ReplaceAll(string(htmlBytes), "{{CODE}}", code)
-	htmlBody = strings.ReplaceAll(htmlBody, "{{NAME}}", cfg.GameName)
-	subject := fmt.Sprintf("您的 %s 验证码", cfg.GameName)
+	htmlBody = strings.ReplaceAll(htmlBody, "{{NAME}}", cfg.Name)
+	subject := fmt.Sprintf("您的 %s 验证码", cfg.Name)
 	if err := email.SendEmail([]string{req.Email}, subject, htmlBody); err != nil {
 		captchaCache.Delete(req.Email)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -128,8 +118,4 @@ func VerifyCaptcha(email, code string) bool {
 		return true
 	}
 	return false
-}
-
-func init() {
-	httpServer.HttpManagerInstance.RegisterHandler(&CaptchaHandler{})
 }

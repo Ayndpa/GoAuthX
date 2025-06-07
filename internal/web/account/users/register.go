@@ -2,52 +2,33 @@ package users
 
 import (
 	"encoding/json"
+	account "goauthx/internal/account"
+	"goauthx/internal/web/account/captcha"
 	"net/http"
-	httpServer "server/pkg/web/http"
 )
 
-// RegisterRequest represents the structure of the registration request
-type RegisterRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
-	Captcha  string `json:"captcha"` // 新增验证码字段
-}
-
-// RegisterResponse represents the structure of the registration response
-type RegisterResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-// RegisterHandler handles the user registration requests
-type RegisterHandler struct{}
-
-// Path returns the HTTP path for the registration handler
-func (h *RegisterHandler) Path() string {
-	return "/user/register"
-}
-
-// Method returns the HTTP method for the registration handler
-func (h *RegisterHandler) Method() string {
-	return "POST"
-}
-
 // Handle processes the registration request
-func (h *RegisterHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	var req RegisterRequest
+func HandleRegister(w http.ResponseWriter, r *http.Request) {
+	var req account.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(RegisterResponse{Code: 1, Message: "Invalid request"})
+		_ = json.NewEncoder(w).Encode(account.RegisterResponse{Code: 1, Message: "Invalid request"})
 		return
 	}
 
-	resp, status := RegisterUser(&req, true)
+	// 验证码校验逻辑移到这里
+	if req.Captcha == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(account.RegisterResponse{Code: 1, Message: "Captcha required"})
+		return
+	}
+	if !captcha.VerifyCaptcha(req.Email, req.Captcha) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(account.RegisterResponse{Code: 4, Message: "Invalid or expired captcha"})
+		return
+	}
+
+	resp, status := account.RegisterUser(&req)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(resp)
-}
-
-func init() {
-	handler := &RegisterHandler{}
-	httpServer.HttpManagerInstance.RegisterHandler(handler)
 }

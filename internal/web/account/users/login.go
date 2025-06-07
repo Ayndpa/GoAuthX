@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"goauthx/internal/account"
+	"goauthx/internal/db"
+	"goauthx/internal/web/account/jwts"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"regexp"
-	users_bans "server/internal/account/users/bans"
-	"server/internal/account/users/jwts"
-	"server/pkg/database"
-	httpServer "server/pkg/web/http"
 	"strings"
 	"time"
 )
@@ -27,17 +26,7 @@ type LoginResponse struct {
 	Token   string `json:"token,omitempty"`
 }
 
-type LoginHandler struct{}
-
-func (h *LoginHandler) Path() string {
-	return "/user/login"
-}
-
-func (h *LoginHandler) Method() string {
-	return "POST"
-}
-
-func (h *LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
+func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var req LoginRequest
 	encoder := json.NewEncoder(w)
@@ -54,7 +43,7 @@ func (h *LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := database.GetMongoConnector()
+	conn, err := db.GetMongoConnector()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = encoder.Encode(LoginResponse{Code: 1, Message: "Database connection error"})
@@ -74,7 +63,7 @@ func (h *LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		filter["username"] = req.Username
 	}
 
-	var user UserDoc // 使用统一的 UserDoc
+	var user account.UserDoc
 	err = conn.DB.Collection("users").FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -91,7 +80,7 @@ func (h *LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	userID := int(user.UserId)
 
 	// 检查用户是否被封禁
-	banned, banInfo, err := users_bans.IsUserBanned(userID)
+	banned, banInfo, err := account.IsUserBanned(userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = encoder.Encode(LoginResponse{Code: 4, Message: "Ban check failed"})
@@ -153,9 +142,4 @@ func toInt64(s string) int64 {
 		n = n*10 + int64(s[i]-'0')
 	}
 	return n
-}
-
-func init() {
-	handler := &LoginHandler{}
-	httpServer.HttpManagerInstance.RegisterHandler(handler)
 }

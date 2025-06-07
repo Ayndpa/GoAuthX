@@ -2,15 +2,20 @@ package db
 
 import (
 	"context"
-	"sync"
-	"time"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"goauthx/pkg/config"
+	"goauthx/internal/config"
+	"sync"
+	"time"
 )
 
+type MongoConnector struct {
+	Client *mongo.Client
+	DB     *mongo.Database
+}
+
 var (
-	clientInstance    *mongo.Client
+	clientInstance    *MongoConnector
 	clientInstanceErr error
 	mongoOnce         sync.Once
 )
@@ -30,11 +35,14 @@ func initMongoClient() {
 		clientInstanceErr = err
 		return
 	}
-	clientInstance = client
+	clientInstance = &MongoConnector{
+		Client: client,
+		DB:     client.Database(cfg.MongoDB.Database),
+	}
 }
 
-// GetMongoClient returns a singleton MongoDB client instance.
-func GetMongoClient() (*mongo.Client, error) {
+// GetMongoConnector returns a singleton MongoConnector instance.
+func GetMongoConnector() (*MongoConnector, error) {
 	mongoOnce.Do(initMongoClient)
 	return clientInstance, clientInstanceErr
 }
