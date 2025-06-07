@@ -3,49 +3,40 @@ package command
 import (
 	"fmt"
 	"strings"
-	"sync"
 )
 
-type CommandFunc func(args []string) string
-
-type commandHandler struct {
-	commands map[string]CommandFunc
-	mu       sync.RWMutex
+// Handler interface that all command handlers must implement
+type Handler interface {
+	Execute(args []string) error
 }
 
-var defaultCommandHandler = &commandHandler{
-	commands: make(map[string]CommandFunc),
+// Registry to hold all handlers
+var handlers = make(map[string]Handler)
+
+// RegisterHandler registers a handler for a command
+func RegisterHandler(command string, handler Handler) {
+	handlers[strings.ToLower(command)] = handler
 }
 
-// 注册命令
-func Register(cmd string, fn CommandFunc) {
-	defaultCommandHandler.mu.Lock()
-	defaultCommandHandler.commands[cmd] = fn
-	defaultCommandHandler.mu.Unlock()
-}
-
-// 处理命令
-func Handle(input string) string {
+// ParseAndExecute parses the input and executes the corresponding handler
+// Command format: "help arg1 arg2 ..."
+func ParseAndExecute(input string) error {
 	parts := strings.Fields(input)
 	if len(parts) == 0 {
-		return "无命令输入"
+		return fmt.Errorf("no command provided")
 	}
-	cmd := parts[0]
-	args := parts[1:]
-	defaultCommandHandler.mu.RLock()
-	fn := defaultCommandHandler.commands[cmd]
-	defaultCommandHandler.mu.RUnlock()
-	if fn == nil {
-		return fmt.Sprintf("未知命令: %s", cmd)
+	cmd := strings.ToLower(parts[0])
+	handler, ok := handlers[cmd]
+	if !ok {
+		return fmt.Errorf("unknown command: %s", cmd)
 	}
-	return fn(args)
+	// Pass all arguments after the command as args (can be multiple)
+	return handler.Execute(parts[1:])
 }
 
 func ListCommands() []string {
-	defaultCommandHandler.mu.RLock()
-	defer defaultCommandHandler.mu.RUnlock()
-	cmds := make([]string, 0, len(defaultCommandHandler.commands))
-	for cmd := range defaultCommandHandler.commands {
+	cmds := make([]string, 0, len(handlers))
+	for cmd := range handlers {
 		cmds = append(cmds, cmd)
 	}
 	return cmds
